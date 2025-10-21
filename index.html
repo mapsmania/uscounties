@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>US Counties Map - MapLibre</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- MapLibre CSS -->
+  <link
+    href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+  <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+  <style>
+    body { margin: 0; padding: 0; }
+    #map { position: absolute; top: 0; bottom: 0; width: 100%; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <script>
+    // Initialize map
+    const map = new maplibregl.Map({
+      container: "map",
+      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      center: [-98, 38.5], // roughly center of continental US
+      zoom: 4,
+    });
+
+    map.on("load", () => {
+      // Add counties GeoJSON source
+      map.addSource("counties", {
+        type: "geojson",
+        data: "uscounties.geojson", // local or hosted file
+      });
+
+      // Add fill layer to show county polygons
+      map.addLayer({
+        id: "county-fill",
+        type: "fill",
+        source: "counties",
+        paint: {
+          "fill-color": "#0080ff",
+          "fill-opacity": 0.2,
+        },
+      });
+
+      // Add county borders
+      map.addLayer({
+        id: "county-borders",
+        type: "line",
+        source: "counties",
+        paint: {
+          "line-color": "#004080",
+          "line-width": 1,
+        },
+      });
+
+      // Optional: Show county name on hover
+      map.on("mousemove", "county-fill", (e) => {
+        map.getCanvas().style.cursor = "pointer";
+        const name = e.features[0].properties.NAME || "Unknown";
+        const state = e.features[0].properties.STATE_NAME || "";
+        new maplibregl.Popup()
+          .setLngLat(e.lngLat)
+          .setHTML(`<strong>${name}</strong><br>${state}`)
+          .addTo(map);
+      });
+
+      map.on("mouseleave", "county-fill", () => {
+        map.getCanvas().style.cursor = "";
+      });
+    });
+  </script>
+</body>
+</html>
