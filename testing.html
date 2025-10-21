@@ -11,11 +11,83 @@
   body { margin:0; padding:0; }
   #map { position:absolute; top:0; bottom:0; width:100%; }
   #controls {
-    position: absolute;
-    top: 10px; left: 10px; z-index: 1;
-    background: white; padding: 8px; border: 1px solid #ccc; font-family: sans-serif;
-  }
-  #controls label { display:block; margin-bottom:4px; }
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+  background: rgba(255, 255, 255, 0.95);
+  padding: 12px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+  font-family: 'Segoe UI', sans-serif;
+}
+
+#toggleBtn {
+  background-color: #ff6600;
+  color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 10px;
+  transition: background 0.3s, transform 0.2s;
+}
+
+#toggleBtn:hover {
+  background-color: #e65500;
+  transform: translateY(-2px);
+}
+
+#bandWidthSlider {
+  width: 180px;
+  height: 6px;
+  border-radius: 3px;
+  background: #ddd;
+  outline: none;
+  -webkit-appearance: none;
+  margin-top: 4px;
+}
+
+#bandWidthSlider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff6600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  transition: background 0.3s, transform 0.2s;
+}
+
+#bandWidthSlider::-webkit-slider-thumb:hover {
+  background: #e65500;
+  transform: scale(1.2);
+}
+
+/* Firefox */
+#bandWidthSlider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff6600;
+  cursor: pointer;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+  transition: background 0.3s, transform 0.2s;
+}
+
+#bandWidthSlider::-moz-range-thumb:hover {
+  background: #e65500;
+  transform: scale(1.2);
+}
+
+#controls label {
+  font-size: 13px;
+  margin-bottom: 4px;
+  display: block;
+}
+
 </style>
 </head>
 <body>
