@@ -24,20 +24,18 @@
     });
 
     map.on("load", async () => {
-      // Load counties
       const response = await fetch("counties.geojson");
       const counties = await response.json();
 
-      // Compute area and centroid longitude for each county
+      // Compute area and centroid longitude
       counties.features.forEach(f => {
-        const areaSqMiles = turf.area(f) / 2_589_988.11; // m² to mi²
+        const areaSqMiles = turf.area(f) / 2_589_988.11;
         const centroid = turf.centroid(f);
         const lon = centroid.geometry.coordinates[0];
         f.properties.area_sq_miles = parseFloat(areaSqMiles.toFixed(1));
         f.properties.centroid_lon = lon;
       });
 
-      // Add counties layer
       map.addSource("counties", { type: "geojson", data: counties });
       map.addLayer({
         id: "county-fill",
@@ -64,68 +62,68 @@
         paint: { "line-color": "#333", "line-width": 0.4 }
       });
 
-      // Group by longitude band (e.g., every 2 degrees)
+      // Group by longitude bands
       const bandSize = 2;
       const bands = {};
-
       for (const f of counties.features) {
         const band = Math.floor(f.properties.centroid_lon / bandSize) * bandSize;
         if (!bands[band]) bands[band] = [];
         bands[band].push(f.properties.area_sq_miles);
       }
 
-      // Compute average area per longitude band
       const averages = [];
       for (const [band, values] of Object.entries(bands)) {
         const avg = values.reduce((a, b) => a + b, 0) / values.length;
-        averages.push({ lon: +band, avg: avg });
+        averages.push({ lon: +band, avg });
       }
 
-      // Create longitude lines with average area labels
+      // Longitude lines
       const lonLines = {
         type: "FeatureCollection",
         features: averages.map(b => ({
           type: "Feature",
-          geometry: {
-            type: "LineString",
-            coordinates: [[b.lon, 25], [b.lon, 49]] // roughly across the continental US
-          },
+          geometry: { type: "LineString", coordinates: [[b.lon, 25], [b.lon, 49]] },
           properties: { longitude: b.lon, avg_area: b.avg }
         }))
       };
 
       map.addSource("lonlines", { type: "geojson", data: lonLines });
 
-      // Add vertical longitude lines
       map.addLayer({
         id: "longitude-lines",
         type: "line",
         source: "lonlines",
-        paint: {
-          "line-color": "#ff6600",
-          "line-width": 1.5,
-          "line-dasharray": [2, 2]
-        }
+        paint: { "line-color": "#ff6600", "line-width": 1.5, "line-dasharray": [2, 2] }
       });
 
-      // Add labels for longitude bands
+      // 💡 Label points near 50° latitude
+      const lonLabels = {
+        type: "FeatureCollection",
+        features: averages.map(b => ({
+          type: "Feature",
+          geometry: { type: "Point", coordinates: [b.lon, 50] }, // <- label position
+          properties: {
+            text: `${b.lon}° — Avg: ${Math.round(b.avg)} sq mi`
+          }
+        }))
+      };
+
+      map.addSource("lonlabels", { type: "geojson", data: lonLabels });
+
       map.addLayer({
         id: "longitude-labels",
         type: "symbol",
-        source: "lonlines",
+        source: "lonlabels",
         layout: {
-          "text-field": [
-            "format",
-            ["concat",
-              ["get", "longitude"], "° — Avg: ",
-              ["to-string", ["round", ["get", "avg_area"]]], " sq mi"
-            ],
-          ],
+          "text-field": ["get", "text"],
           "text-size": 12,
-          "symbol-placement": "line-center"
+          "text-anchor": "bottom",
+          "text-offset": [0, -0.5] // small lift above line
         },
         paint: {
-          "text-color": "#cc3300"
+          "text-color": "#cc3300",
+          "text-halo-color": "#ffffff",
+          "text-halo-width": 1.5
         }
       });
 
