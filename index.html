@@ -40,7 +40,7 @@
       counties.features.forEach((feature) => {
         const areaSqMeters = turf.area(feature);
         const areaSqMiles = areaSqMeters / 2_589_988.11; // m² to mi²
-        feature.properties.area_sq_miles = areaSqMiles.toFixed(1);
+        feature.properties.area_sq_miles = parseFloat(areaSqMiles.toFixed(1));
       });
 
       // Add as a source
