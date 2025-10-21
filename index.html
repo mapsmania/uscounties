@@ -2,15 +2,18 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>US Counties Map - MapLibre</title>
+  <title>US Counties Area with Turf.js + MapLibre</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- MapLibre CSS -->
+  <!-- MapLibre CSS & JS -->
   <link
     href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css"
     rel="stylesheet"
   />
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+  <!-- Turf.js -->
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
   <style>
     body { margin: 0; padding: 0; }
@@ -21,56 +24,76 @@
   <div id="map"></div>
 
   <script>
-    // Initialize map
     const map = new maplibregl.Map({
       container: "map",
-      style: "https://tiles.openfreemap.org/styles/positron",
-      center: [-98, 38.5], // roughly center of continental US
+      style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
+      center: [-98, 38.5],
       zoom: 4,
     });
 
-    map.on("load", () => {
-      // Add counties GeoJSON source
-      map.addSource("counties", {
-        type: "geojson",
-        data: "counties.geojson", // local or hosted file
+    map.on("load", async () => {
+      // Load the counties GeoJSON
+      const response = await fetch("counties.geojson");
+      const counties = await response.json();
+
+      // Calculate area for each county using Turf.js
+      counties.features.forEach((feature) => {
+        const areaSqMeters = turf.area(feature);
+        const areaSqMiles = areaSqMeters / 2_589_988.11; // m² to mi²
+        feature.properties.area_sq_miles = areaSqMiles.toFixed(1);
       });
 
-      // Add fill layer to show county polygons
+      // Add as a source
+      map.addSource("counties", {
+        type: "geojson",
+        data: counties,
+      });
+
+      // Fill layer with color based on area
       map.addLayer({
         id: "county-fill",
         type: "fill",
         source: "counties",
         paint: {
-          "fill-color": "#0080ff",
-          "fill-opacity": 0.2,
+          "fill-color": [
+            "interpolate",
+            ["linear"],
+            ["get", "area_sq_miles"],
+            0, "#edf8fb",
+            500, "#b2e2e2",
+            1000, "#66c2a4",
+            2000, "#238b45",
+            4000, "#00441b"
+          ],
+          "fill-opacity": 0.7
         },
       });
 
-      // Add county borders
+      // Borders
       map.addLayer({
         id: "county-borders",
         type: "line",
         source: "counties",
-        paint: {
-          "line-color": "#004080",
-          "line-width": 1,
-        },
+        paint: { "line-color": "#333", "line-width": 0.5 }
       });
 
-      // Optional: Show county name on hover
+      // Popup showing county name and area
+      const popup = new maplibregl.Popup({ closeButton: false });
+
       map.on("mousemove", "county-fill", (e) => {
         map.getCanvas().style.cursor = "pointer";
-        const name = e.features[0].properties.NAME || "Unknown";
-        const state = e.features[0].properties.STATE_NAME || "";
-        new maplibregl.Popup()
+        const feature = e.features[0];
+        const name = feature.properties.NAME || "Unknown";
+        const area = feature.properties.area_sq_miles;
+        popup
           .setLngLat(e.lngLat)
-          .setHTML(`<strong>${name}</strong><br>${state}`)
+          .setHTML(`<strong>${name}</strong><br>${area} sq mi`)
           .addTo(map);
       });
 
       map.on("mouseleave", "county-fill", () => {
         map.getCanvas().style.cursor = "";
+        popup.remove();
       });
     });
   </script>
