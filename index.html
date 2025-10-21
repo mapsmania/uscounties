@@ -2,12 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>County Area by Latitude (MapLibre + Turf.js)</title>
+  <title>Average County Size by Longitude (MapLibre + Turf.js)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
-
   <style>
     body { margin: 0; padding: 0; }
     #map { position: absolute; top: 0; bottom: 0; width: 100%; }
@@ -29,13 +28,13 @@
       const response = await fetch("counties.geojson");
       const counties = await response.json();
 
-      // Compute area (sq miles) and centroid latitude for each county
+      // Compute area and centroid longitude for each county
       counties.features.forEach(f => {
-        const areaSqMiles = turf.area(f) / 2_589_988.11;
+        const areaSqMiles = turf.area(f) / 2_589_988.11; // m² to mi²
         const centroid = turf.centroid(f);
-        const lat = centroid.geometry.coordinates[1];
+        const lon = centroid.geometry.coordinates[0];
         f.properties.area_sq_miles = parseFloat(areaSqMiles.toFixed(1));
-        f.properties.centroid_lat = lat;
+        f.properties.centroid_lon = lon;
       });
 
       // Add counties layer
@@ -58,7 +57,6 @@
           "fill-opacity": 0.7
         }
       });
-
       map.addLayer({
         id: "county-borders",
         type: "line",
@@ -66,43 +64,43 @@
         paint: { "line-color": "#333", "line-width": 0.4 }
       });
 
-      // Group by latitude band (e.g., every 2 degrees)
+      // Group by longitude band (e.g., every 2 degrees)
       const bandSize = 2;
       const bands = {};
 
       for (const f of counties.features) {
-        const band = Math.floor(f.properties.centroid_lat / bandSize) * bandSize;
+        const band = Math.floor(f.properties.centroid_lon / bandSize) * bandSize;
         if (!bands[band]) bands[band] = [];
         bands[band].push(f.properties.area_sq_miles);
       }
 
-      // Compute average area per latitude band
+      // Compute average area per longitude band
       const averages = [];
       for (const [band, values] of Object.entries(bands)) {
         const avg = values.reduce((a, b) => a + b, 0) / values.length;
-        averages.push({ lat: +band, avg: avg });
+        averages.push({ lon: +band, avg: avg });
       }
 
-      // Create latitude lines with average area labels
-      const latLines = {
+      // Create longitude lines with average area labels
+      const lonLines = {
         type: "FeatureCollection",
         features: averages.map(b => ({
           type: "Feature",
           geometry: {
             type: "LineString",
-            coordinates: [[-125, b.lat], [-66, b.lat]] // across the continental US
+            coordinates: [[b.lon, 25], [b.lon, 49]] // roughly across the continental US
           },
-          properties: { latitude: b.lat, avg_area: b.avg }
+          properties: { longitude: b.lon, avg_area: b.avg }
         }))
       };
 
-      map.addSource("latlines", { type: "geojson", data: latLines });
+      map.addSource("lonlines", { type: "geojson", data: lonLines });
 
-      // Add latitude lines
+      // Add vertical longitude lines
       map.addLayer({
-        id: "latitude-lines",
+        id: "longitude-lines",
         type: "line",
-        source: "latlines",
+        source: "lonlines",
         paint: {
           "line-color": "#ff6600",
           "line-width": 1.5,
@@ -110,15 +108,18 @@
         }
       });
 
-      // Add labels for latitude bands
+      // Add labels for longitude bands
       map.addLayer({
-        id: "latitude-labels",
+        id: "longitude-labels",
         type: "symbol",
-        source: "latlines",
+        source: "lonlines",
         layout: {
           "text-field": [
             "format",
-            ["concat", ["get", "latitude"], "° — Avg: ", ["to-string", ["round", ["get", "avg_area"]]], " sq mi"],
+            ["concat",
+              ["get", "longitude"], "° — Avg: ",
+              ["to-string", ["round", ["get", "avg_area"]]], " sq mi"
+            ],
           ],
           "text-size": 12,
           "symbol-placement": "line-center"
@@ -128,7 +129,7 @@
         }
       });
 
-      console.log("Latitude averages:", averages);
+      console.log("Longitude averages:", averages);
     });
   </script>
 </body>
