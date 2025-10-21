@@ -2,17 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>US Counties Area with Turf.js + MapLibre</title>
+  <title>County Area by Latitude (MapLibre + Turf.js)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-  <!-- MapLibre CSS & JS -->
-  <link
-    href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css"
-    rel="stylesheet"
-  />
+  <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
   <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
-
-  <!-- Turf.js -->
   <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
   <style>
@@ -32,24 +25,21 @@
     });
 
     map.on("load", async () => {
-      // Load the counties GeoJSON
+      // Load counties
       const response = await fetch("counties.geojson");
       const counties = await response.json();
 
-      // Calculate area for each county using Turf.js
-      counties.features.forEach((feature) => {
-        const areaSqMeters = turf.area(feature);
-        const areaSqMiles = areaSqMeters / 2_589_988.11; // m² to mi²
-        feature.properties.area_sq_miles = parseFloat(areaSqMiles.toFixed(1));
+      // Compute area (sq miles) and centroid latitude for each county
+      counties.features.forEach(f => {
+        const areaSqMiles = turf.area(f) / 2_589_988.11;
+        const centroid = turf.centroid(f);
+        const lat = centroid.geometry.coordinates[1];
+        f.properties.area_sq_miles = parseFloat(areaSqMiles.toFixed(1));
+        f.properties.centroid_lat = lat;
       });
 
-      // Add as a source
-      map.addSource("counties", {
-        type: "geojson",
-        data: counties,
-      });
-
-      // Fill layer with color based on area
+      // Add counties layer
+      map.addSource("counties", { type: "geojson", data: counties });
       map.addLayer({
         id: "county-fill",
         type: "fill",
@@ -66,35 +56,79 @@
             4000, "#00441b"
           ],
           "fill-opacity": 0.7
-        },
+        }
       });
 
-      // Borders
       map.addLayer({
         id: "county-borders",
         type: "line",
         source: "counties",
-        paint: { "line-color": "#333", "line-width": 0.5 }
+        paint: { "line-color": "#333", "line-width": 0.4 }
       });
 
-      // Popup showing county name and area
-      const popup = new maplibregl.Popup({ closeButton: false });
+      // Group by latitude band (e.g., every 2 degrees)
+      const bandSize = 2;
+      const bands = {};
 
-      map.on("mousemove", "county-fill", (e) => {
-        map.getCanvas().style.cursor = "pointer";
-        const feature = e.features[0];
-        const name = feature.properties.NAME || "Unknown";
-        const area = feature.properties.area_sq_miles;
-        popup
-          .setLngLat(e.lngLat)
-          .setHTML(`<strong>${name}</strong><br>${area} sq mi`)
-          .addTo(map);
+      for (const f of counties.features) {
+        const band = Math.floor(f.properties.centroid_lat / bandSize) * bandSize;
+        if (!bands[band]) bands[band] = [];
+        bands[band].push(f.properties.area_sq_miles);
+      }
+
+      // Compute average area per latitude band
+      const averages = [];
+      for (const [band, values] of Object.entries(bands)) {
+        const avg = values.reduce((a, b) => a + b, 0) / values.length;
+        averages.push({ lat: +band, avg: avg });
+      }
+
+      // Create latitude lines with average area labels
+      const latLines = {
+        type: "FeatureCollection",
+        features: averages.map(b => ({
+          type: "Feature",
+          geometry: {
+            type: "LineString",
+            coordinates: [[-125, b.lat], [-66, b.lat]] // across the continental US
+          },
+          properties: { latitude: b.lat, avg_area: b.avg }
+        }))
+      };
+
+      map.addSource("latlines", { type: "geojson", data: latLines });
+
+      // Add latitude lines
+      map.addLayer({
+        id: "latitude-lines",
+        type: "line",
+        source: "latlines",
+        paint: {
+          "line-color": "#ff6600",
+          "line-width": 1.5,
+          "line-dasharray": [2, 2]
+        }
       });
 
-      map.on("mouseleave", "county-fill", () => {
-        map.getCanvas().style.cursor = "";
-        popup.remove();
+      // Add labels for latitude bands
+      map.addLayer({
+        id: "latitude-labels",
+        type: "symbol",
+        source: "latlines",
+        layout: {
+          "text-field": [
+            "format",
+            ["concat", ["get", "latitude"], "° — Avg: ", ["to-string", ["round", ["get", "avg_area"]]], " sq mi"],
+          ],
+          "text-size": 12,
+          "symbol-placement": "line-center"
+        },
+        paint: {
+          "text-color": "#cc3300"
+        }
       });
+
+      console.log("Latitude averages:", averages);
     });
   </script>
 </body>
