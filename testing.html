@@ -137,12 +137,13 @@ let counties;
 let bandWidth = 2;
 let colorMode = "area";
 let bandGeoJSON;
+let activePopup = null; // track open popup
 
 map.on("load", async () => {
   const response = await fetch("countypops.geojson");
   counties = await response.json();
 
-  // Compute area, centroid, population, and density
+  // Compute derived properties
   counties.features.forEach(f => {
     const areaSqMiles = turf.area(f) / 2_589_988.11;
     const centroid = turf.centroid(f);
@@ -154,7 +155,7 @@ map.on("load", async () => {
     f.properties.density = parseFloat(density.toFixed(2));
   });
 
-  // Function to build longitude bands
+  // Build longitude bands
   function createLongitudeBands(data, width, mode) {
     const bands = {};
     for (const f of data.features) {
@@ -171,7 +172,8 @@ map.on("load", async () => {
     for (const [bandStart, values] of Object.entries(bands)) {
       const bandStartNum = parseFloat(bandStart);
       const bandEnd = bandStartNum + width;
-      const avg = values.filter(v => v > 0).reduce((a, b) => a + b, 0) / (values.filter(v => v > 0).length || 1);
+      const validVals = values.filter(v => v > 0);
+      const avg = validVals.reduce((a, b) => a + b, 0) / (validVals.length || 1);
       features.push({
         type: "Feature",
         geometry: {
@@ -187,18 +189,14 @@ map.on("load", async () => {
         properties: { 
           avg_value: avg,
           bandStart: bandStartNum,
-          bandEnd: bandEnd,
-          avg_area: avg, // convenience for popup
-          avg_population: avg,
-          avg_density: avg
+          bandEnd: bandEnd
         }
       });
     }
-
     return { type: "FeatureCollection", features };
   }
 
-  // Color ramps
+  // Paint expressions
   const countyPaints = {
     area: ["interpolate", ["linear"], ["get", "area_sq_miles"],
       0, "#edf8fb", 500, "#b2e2e2", 1000, "#66c2a4", 2000, "#238b45", 4000, "#00441b"],
@@ -217,7 +215,7 @@ map.on("load", async () => {
       0, "#f7fcf5", 10, "#c7e9c0", 100, "#74c476", 500, "#238b45", 2000, "#00441b"]
   };
 
-  // Add layers
+  // Add sources and layers
   map.addSource("counties", { type: "geojson", data: counties });
   map.addLayer({
     id: "county-fill",
@@ -249,50 +247,50 @@ map.on("load", async () => {
     layout: { visibility: "none" }
   });
 
-  // === POPUPS ===
+  // === POPUPS ON CLICK ===
+  function showPopup(lngLat, html) {
+    if (activePopup) activePopup.remove();
+    activePopup = new maplibregl.Popup({ closeButton: true })
+      .setLngLat(lngLat)
+      .setHTML(html)
+      .addTo(map);
+  }
 
-  // Counties
-  map.on("mousemove", "county-fill", (e) => {
-    map.getCanvas().style.cursor = "pointer";
+  // County click
+  map.on("click", "county-fill", (e) => {
     const f = e.features[0];
-    const props = f.properties;
-    const name = props.NAME || props.County || "Unnamed County";
+    const p = f.properties;
+    const name = p.NAME || p.County || "Unnamed County";
     const html = `
       <strong>${name}</strong><br>
-      Area: ${props.area_sq_miles.toLocaleString()} sq mi<br>
-      Population: ${props.population.toLocaleString()}<br>
-      Density: ${props.density.toLocaleString()} /sq mi
+      Area: ${p.area_sq_miles.toLocaleString()} sq mi<br>
+      Population: ${p.population.toLocaleString()}<br>
+      Density: ${p.density.toLocaleString()} /sq mi
     `;
-    new maplibregl.Popup({ closeButton: false })
-      .setLngLat(e.lngLat)
-      .setHTML(html)
-      .addTo(map);
-  });
-  map.on("mouseleave", "county-fill", () => {
-    map.getCanvas().style.cursor = "";
-    const popups = document.getElementsByClassName("maplibregl-popup");
-    if (popups.length) popups[0].remove();
+    showPopup(e.lngLat, html);
   });
 
-  // Longitude Bands
-  map.on("mousemove", "lonband-fill", (e) => {
-    map.getCanvas().style.cursor = "pointer";
+  // Band click
+  map.on("click", "lonband-fill", (e) => {
     const f = e.features[0];
-    const props = f.properties;
+    const p = f.properties;
     const html = `
       <strong>Longitude Band</strong><br>
-      ${props.bandStart.toFixed(1)}° to ${props.bandEnd.toFixed(1)}° W<br>
-      Average ${colorMode}: ${props.avg_value.toLocaleString(undefined, {maximumFractionDigits: 1})}
+      ${p.bandStart.toFixed(1)}° to ${p.bandEnd.toFixed(1)}° W<br>
+      Average ${colorMode}: ${p.avg_value.toLocaleString(undefined, { maximumFractionDigits: 1 })}
     `;
-    new maplibregl.Popup({ closeButton: false })
-      .setLngLat(e.lngLat)
-      .setHTML(html)
-      .addTo(map);
+    showPopup(e.lngLat, html);
   });
-  map.on("mouseleave", "lonband-fill", () => {
-    map.getCanvas().style.cursor = "";
-    const popups = document.getElementsByClassName("maplibregl-popup");
-    if (popups.length) popups[0].remove();
+
+  // Close popup on map click elsewhere
+  map.on("click", (e) => {
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: ["county-fill", "lonband-fill"]
+    });
+    if (!features.length && activePopup) {
+      activePopup.remove();
+      activePopup = null;
+    }
   });
 
   // === CONTROLS ===
