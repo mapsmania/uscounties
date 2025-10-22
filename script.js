@@ -119,6 +119,22 @@ map.on("load", async () => {
     layout: { visibility: "none" }
   });
 
+  // Change cursor to pointer when hovering over clickable layers
+map.on("mouseenter", "county-fill", () => {
+  map.getCanvas().style.cursor = "pointer";
+});
+map.on("mouseleave", "county-fill", () => {
+  map.getCanvas().style.cursor = "";
+});
+
+map.on("mouseenter", "lonband-fill", () => {
+  map.getCanvas().style.cursor = "pointer";
+});
+map.on("mouseleave", "lonband-fill", () => {
+  map.getCanvas().style.cursor = "";
+});
+
+
   // === POPUPS ON CLICK ===
   function showPopup(lngLat, html) {
     if (activePopup) activePopup.remove();
