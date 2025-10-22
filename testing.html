@@ -224,24 +224,28 @@ map.on("load", async () => {
   });
 
   // Band width slider
-  const slider=document.getElementById("bandWidthSlider");
-  const bandValueDisplay=document.getElementById("bandValue");
-  slider.addEventListener("input",()=>{
-    const newWidth=parseFloat(slider.value);
-    bandValueDisplay.textContent=newWidth.toFixed(1);
-    const steps=10; const stepSize=(newWidth-bandWidth)/steps;
-    let currentStep=0;
-    function animateStep(){
-      if(currentStep>=steps) return;
-      const intermediateWidth=bandWidth+stepSize*(currentStep+1);
-      const intermediateBands=createLongitudeBands(counties,intermediateWidth,colorMode);
-      map.getSource("lonbands").setData(intermediateBands);
-      currentStep++;
-      requestAnimationFrame(animateStep);
-    }
-    animateStep();
-    bandWidth=newWidth;
-  });
+  const slider = document.getElementById("bandWidthSlider");
+slider.addEventListener("input", () => {
+  const newWidth = parseFloat(slider.value);
+  document.getElementById("bandValue").textContent = newWidth.toFixed(1);
+
+  const steps = 10;
+  const stepSize = (newWidth - bandWidth) / steps;
+  let currentStep = 0;
+
+  function animateStep() {
+    if (currentStep >= steps) return;
+    const intermediateWidth = bandWidth + stepSize * (currentStep + 1);
+    const intermediateBands = createLongitudeBands(counties, intermediateWidth, colorMode);
+    map.getSource("lonbands").setData(intermediateBands);
+    currentStep++;
+    requestAnimationFrame(animateStep);
+  }
+
+  animateStep();
+  bandWidth = newWidth;
+});
+
 
 });
 </script>
