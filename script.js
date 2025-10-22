@@ -7,14 +7,15 @@ const map = new maplibregl.Map({
 
 let counties;
 let bandWidth = 2;
-let bandGeoJSON;
 let colorMode = "area";
+let bandGeoJSON;
+let activePopup = null; // track open popup
 
 map.on("load", async () => {
   const response = await fetch("countypops.geojson");
   counties = await response.json();
 
-  // Compute area, centroid, population, density
+  // Compute derived properties
   counties.features.forEach(f => {
     const areaSqMiles = turf.area(f) / 2_589_988.11;
     const centroid = turf.centroid(f);
@@ -26,6 +27,7 @@ map.on("load", async () => {
     f.properties.density = parseFloat(density.toFixed(2));
   });
 
+  // Build longitude bands
   function createLongitudeBands(data, width, mode) {
     const bands = {};
     for (const f of data.features) {
@@ -42,17 +44,27 @@ map.on("load", async () => {
     for (const [bandStart, values] of Object.entries(bands)) {
       const bandStartNum = parseFloat(bandStart);
       const bandEnd = bandStartNum + width;
-      const avg = values.filter(v => v > 0).reduce((a,b)=>a+b,0) / values.filter(v => v > 0).length || 0;
-
+      const validVals = values.filter(v => v > 0);
+      const avg = validVals.reduce((a, b) => a + b, 0) / (validVals.length || 1);
       features.push({
         type: "Feature",
-        geometry: { type: "Polygon", coordinates: [[
-          [bandStartNum, 25], [bandEnd, 25], [bandEnd, 49], [bandStartNum, 49], [bandStartNum, 25]
-        ]]},
-        properties: { avg_value: avg, bandStart: bandStartNum, bandEnd }
+        geometry: {
+          type: "Polygon",
+          coordinates: [[
+            [bandStartNum, 25],
+            [bandEnd, 25],
+            [bandEnd, 49],
+            [bandStartNum, 49],
+            [bandStartNum, 25]
+          ]]
+        },
+        properties: { 
+          avg_value: avg,
+          bandStart: bandStartNum,
+          bandEnd: bandEnd
+        }
       });
     }
-
     return { type: "FeatureCollection", features };
   }
 
@@ -75,7 +87,7 @@ map.on("load", async () => {
       0, "#f7fcf5", 10, "#c7e9c0", 100, "#74c476", 500, "#238b45", 2000, "#00441b"]
   };
 
-  // Add county layers
+  // Add sources and layers
   map.addSource("counties", { type: "geojson", data: counties });
   map.addLayer({
     id: "county-fill",
@@ -90,7 +102,6 @@ map.on("load", async () => {
     paint: { "line-color": "#333", "line-width": 0.4 }
   });
 
-  // Add band layers
   bandGeoJSON = createLongitudeBands(counties, bandWidth, colorMode);
   map.addSource("lonbands", { type: "geojson", data: bandGeoJSON });
   map.addLayer({
@@ -104,12 +115,58 @@ map.on("load", async () => {
     id: "lonband-borders",
     type: "line",
     source: "lonbands",
-    paint: { "line-color": "#ff6600", "line-width": 1.5, "line-dasharray":[2,2] },
+    paint: { "line-color": "#ff6600", "line-width": 1.5, "line-dasharray": [2, 2] },
     layout: { visibility: "none" }
   });
 
-  // Controls
-  let mode = "county"; // county vs band
+  // === POPUPS ON CLICK ===
+  function showPopup(lngLat, html) {
+    if (activePopup) activePopup.remove();
+    activePopup = new maplibregl.Popup({ closeButton: true })
+      .setLngLat(lngLat)
+      .setHTML(html)
+      .addTo(map);
+  }
+
+  // County click
+  map.on("click", "county-fill", (e) => {
+    const f = e.features[0];
+    const p = f.properties;
+    const name = p.NAME || p.County || "Unnamed County";
+    const html = `
+      <strong>${name}</strong><br>
+      Area: ${p.area_sq_miles.toLocaleString()} sq mi<br>
+      Population: ${p.population.toLocaleString()}<br>
+      Density: ${p.density.toLocaleString()} /sq mi
+    `;
+    showPopup(e.lngLat, html);
+  });
+
+  // Band click
+  map.on("click", "lonband-fill", (e) => {
+    const f = e.features[0];
+    const p = f.properties;
+    const html = `
+      <strong>Longitude Band</strong><br>
+      ${p.bandStart.toFixed(1)}° to ${p.bandEnd.toFixed(1)}° W<br>
+      Average ${colorMode}: ${p.avg_value.toLocaleString(undefined, { maximumFractionDigits: 1 })}
+    `;
+    showPopup(e.lngLat, html);
+  });
+
+  // Close popup on map click elsewhere
+  map.on("click", (e) => {
+    const features = map.queryRenderedFeatures(e.point, {
+      layers: ["county-fill", "lonband-fill"]
+    });
+    if (!features.length && activePopup) {
+      activePopup.remove();
+      activePopup = null;
+    }
+  });
+
+  // === CONTROLS ===
+  let mode = "county";
   const btn = document.getElementById("toggleBtn");
   const select = document.getElementById("colorMode");
   const slider = document.getElementById("bandWidthSlider");
@@ -130,17 +187,16 @@ map.on("load", async () => {
 
     const stops = legendStops[colorMode];
     const colors = legendColors[colorMode];
-    let html = `<div class="legend-title">Color by ${colorMode.charAt(0).toUpperCase()+colorMode.slice(1)}</div>`;
-    stops.forEach((v,i) => {
+    let html = `<div class="legend-title">Color by ${colorMode.charAt(0).toUpperCase() + colorMode.slice(1)}</div>`;
+    stops.forEach((v, i) => {
       html += `<div><span class="legend-color" style="background:${colors[i]}"></span>${v.toLocaleString()}</div>`;
     });
-    if(colorMode==="population" && viewMode==="band") {
+    if (colorMode === "population" && viewMode === "band") {
       html += `<div class="legend-note">Note: Longitude bands show <strong>average county population</strong>, not population density.</div>`;
     }
     legendDiv.innerHTML = html;
   }
 
-  // Initial legend
   updateLegend(colorMode, mode);
 
   btn.addEventListener("click", () => {
@@ -175,11 +231,11 @@ map.on("load", async () => {
     const newWidth = parseFloat(slider.value);
     bandValueDisplay.textContent = newWidth.toFixed(1);
     const steps = 10;
-    const stepSize = (newWidth - bandWidth)/steps;
+    const stepSize = (newWidth - bandWidth) / steps;
     let currentStep = 0;
     function animateStep() {
-      if(currentStep>=steps) return;
-      const intermediateWidth = bandWidth + stepSize*(currentStep+1);
+      if (currentStep >= steps) return;
+      const intermediateWidth = bandWidth + stepSize * (currentStep + 1);
       const intermediateBands = createLongitudeBands(counties, intermediateWidth, colorMode);
       map.getSource("lonbands").setData(intermediateBands);
       currentStep++;
@@ -188,5 +244,4 @@ map.on("load", async () => {
     animateStep();
     bandWidth = newWidth;
   });
-
 });
