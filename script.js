@@ -3,7 +3,18 @@ const map = new maplibregl.Map({
   style: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
   center: [-98, 38.5],
   zoom: 4,
+  attributionControl: false // disable default control so we can customize it
 });
+
+// Add custom attribution control with your link
+map.addControl(
+  new maplibregl.AttributionControl({
+    compact: true,
+    customAttribution:
+      'Map data © <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors | ' +
+      '<a href="https://googlemapsmania.blogspot.com/2025/10/county-stripes.html" target="_blank">About this map</a>'
+  })
+);
 
 let counties;
 let bandWidth = 2;
