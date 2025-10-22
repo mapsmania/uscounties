@@ -112,7 +112,7 @@ let bandGeoJSON;
 
 map.on("load", async () => {
   // Load county data
-  const response = await fetch("counties.geojson");
+  const response = await fetch("countypops.geojson");
   counties = await response.json();
 
   // Compute area and centroid longitude
