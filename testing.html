@@ -81,6 +81,32 @@
     font-size: 14px;
     cursor: pointer;
   }
+  /* Legend styling */
+#legend {
+  font-size: 12px;
+  line-height: 1.4em;
+  background: rgba(255,255,255,0.9);
+  padding: 6px 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+.legend-title {
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+.legend-note {
+  font-size: 11px;
+  font-style: italic;
+  margin-top: 4px;
+}
+.legend-color {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
 </style>
 </head>
 <body>
@@ -95,6 +121,7 @@
   </select><br>
   <label for="bandWidthSlider">Band Width (°): <span id="bandValue">2</span></label>
   <input type="range" id="bandWidthSlider" min="1" max="20" step="0.1" value="2">
+  <div id="legend" style="margin-top: 10px;"></div>
 </div>
 
 <script>
@@ -265,6 +292,72 @@ map.on("load", async () => {
     bandWidth = newWidth;
   });
 });
+
+  // Legend setup
+const legendDiv = document.getElementById("legend");
+
+const legendStops = {
+  area: [0, 500, 1000, 2000, 4000],
+  population: [0, 10000, 50000, 200000, 1000000],
+  density: [0, 10, 100, 500, 2000]
+};
+
+const legendColors = {
+  area: ["#edf8fb","#b2e2e2","#66c2a4","#238b45","#00441b"],
+  population: ["#fff5f0","#fcbba1","#fc9272","#fb6a4a","#a50f15"],
+  density: ["#f7fcf5","#c7e9c0","#74c476","#238b45","#00441b"]
+};
+
+// Function to update legend
+function updateLegend(mode) {
+  const stops = legendStops[mode];
+  const colors = legendColors[mode];
+  let html = `<div class="legend-title">Color by ${mode.charAt(0).toUpperCase()+mode.slice(1)}</div>`;
+  stops.forEach((v,i) => {
+    html += `<div><span class="legend-color" style="background:${colors[i]}"></span>${v.toLocaleString()}</div>`;
+  });
+
+  // Add special note for population bands
+  if (mode === "population" && viewMode === "band") {
+    html += `<div class="legend-note">Note: Longitude bands show <strong>average county population</strong>, not population density.</div>`;
+  }
+
+  legendDiv.innerHTML = html;
+}
+
+// Initial legend
+updateLegend(colorMode);
+
+// Update legend when color mode changes
+select.addEventListener("change", () => {
+  colorMode = select.value;
+  map.setPaintProperty("county-fill", "fill-color", countyPaints[colorMode]);
+  map.setPaintProperty("lonband-fill", "fill-color", bandPaints[colorMode]);
+  const newBands = createLongitudeBands(counties, bandWidth, colorMode);
+  map.getSource("lonbands").setData(newBands);
+  updateLegend(colorMode);
+});
+
+// Update legend when toggling between county/band
+btn.addEventListener("click", () => {
+  if (mode === "county") {
+    map.setLayoutProperty("county-fill","visibility","none");
+    map.setLayoutProperty("county-borders","visibility","none");
+    map.setLayoutProperty("lonband-fill","visibility","visible");
+    map.setLayoutProperty("lonband-borders","visibility","visible");
+    btn.innerText="Switch to County Coloring";
+    mode="band";
+  } else {
+    map.setLayoutProperty("county-fill","visibility","visible");
+    map.setLayoutProperty("county-borders","visibility","visible");
+    map.setLayoutProperty("lonband-fill","visibility","none");
+    map.setLayoutProperty("lonband-borders","visibility","none");
+    btn.innerText="Switch to Longitude Bands";
+    mode="county";
+  }
+  updateLegend(colorMode); // refresh legend after toggle
+});
+
 </script>
 </body>
 </html>
