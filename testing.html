@@ -118,15 +118,27 @@ map.on("load", async () => {
   });
 
   // --- Define paint styles ---
-  const paintArea = [
-    "interpolate", ["linear"], ["get", "area_sq_miles"],
-    0, "#edf8fb", 500, "#b2e2e2", 1000, "#66c2a4", 2000, "#238b45", 4000, "#00441b"
-  ];
+  const countyPaints = {
+    area: [
+      "interpolate", ["linear"], ["get", "area_sq_miles"],
+      0, "#edf8fb", 500, "#b2e2e2", 1000, "#66c2a4", 2000, "#238b45", 4000, "#00441b"
+    ],
+    population: [
+      "interpolate", ["linear"], ["get", "population"],
+      0, "#fff5f0", 10000, "#fcbba1", 50000, "#fc9272", 200000, "#fb6a4a", 1000000, "#a50f15"
+    ]
+  };
 
-  const paintPop = [
-    "interpolate", ["linear"], ["get", "population"],
-    0, "#fff5f0", 10000, "#fcbba1", 50000, "#fc9272", 200000, "#fb6a4a", 1000000, "#a50f15"
-  ];
+  const bandPaints = {
+    area: [
+      "interpolate", ["linear"], ["get", "avg_value"],
+      0, "#edf8fb", 500, "#b2e2e2", 1000, "#66c2a4", 2000, "#238b45", 4000, "#00441b"
+    ],
+    population: [
+      "interpolate", ["linear"], ["get", "avg_value"],
+      0, "#fff5f0", 10000, "#fcbba1", 50000, "#fc9272", 200000, "#fb6a4a", 1000000, "#a50f15"
+    ]
+  };
 
   // --- County layers ---
   map.addSource("counties", { type: "geojson", data: counties });
@@ -134,7 +146,7 @@ map.on("load", async () => {
     id: "county-fill",
     type: "fill",
     source: "counties",
-    paint: { "fill-color": paintArea, "fill-opacity": 0.7 }
+    paint: { "fill-color": countyPaints.area, "fill-opacity": 0.7 }
   });
   map.addLayer({
     id: "county-borders",
@@ -151,9 +163,8 @@ map.on("load", async () => {
       const bandStart = Math.floor(lon / width) * width;
       const key = `${bandStart}`;
       if (!bands[key]) bands[key] = [];
-      bands[key].push(
-        mode === "area" ? f.properties.area_sq_miles : f.properties.population
-      );
+      const value = mode === "area" ? f.properties.area_sq_miles : f.properties.population;
+      if (value != null && !isNaN(value)) bands[key].push(value);
     }
 
     const features = [];
@@ -161,7 +172,7 @@ map.on("load", async () => {
       const bandStartNum = parseFloat(bandStart);
       const bandEnd = bandStartNum + width;
       const bandCenter = bandStartNum + width / 2;
-      const avg = values.reduce((a, b) => a + b, 0) / values.length;
+      const avg = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
 
       features.push({
         type: "Feature",
@@ -185,7 +196,7 @@ map.on("load", async () => {
     id: "lonband-fill",
     type: "fill",
     source: "lonbands",
-    paint: { "fill-color": paintArea, "fill-opacity": 0.6 },
+    paint: { "fill-color": bandPaints.area, "fill-opacity": 0.6 },
     layout: { visibility: "none" }
   });
   map.addLayer({
@@ -222,17 +233,26 @@ map.on("load", async () => {
     if (colorMode === "area") {
       colorMode = "population";
       modeBtn.innerText = "Color by Area";
-      map.setPaintProperty("county-fill", "fill-color", paintPop);
+
+      // Update counties
+      map.setPaintProperty("county-fill", "fill-color", countyPaints.population);
+
+      // Update bands
       const newBands = createLongitudeBands(counties, bandWidth, colorMode);
       map.getSource("lonbands").setData(newBands);
-      map.setPaintProperty("lonband-fill", "fill-color", paintPop);
+      map.setPaintProperty("lonband-fill", "fill-color", bandPaints.population);
+
     } else {
       colorMode = "area";
       modeBtn.innerText = "Color by Population";
-      map.setPaintProperty("county-fill", "fill-color", paintArea);
+
+      // Update counties
+      map.setPaintProperty("county-fill", "fill-color", countyPaints.area);
+
+      // Update bands
       const newBands = createLongitudeBands(counties, bandWidth, colorMode);
       map.getSource("lonbands").setData(newBands);
-      map.setPaintProperty("lonband-fill", "fill-color", paintArea);
+      map.setPaintProperty("lonband-fill", "fill-color", bandPaints.area);
     }
   });
 
