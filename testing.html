@@ -198,8 +198,86 @@ map.addLayer({
 });
 
 
-  // Keep all other interactivity and control logic the same...
-  // (unchanged code for hover, popups, toggle, color mode, slider)
+    // === CONTROLS ===
+  let mode = "county";
+  const btn = document.getElementById("toggleBtn");
+  const select = document.getElementById("colorMode");
+  const slider = document.getElementById("bandWidthSlider");
+  const bandValueDisplay = document.getElementById("bandValue");
+  const legendDiv = document.getElementById("legend");
+
+  function updateLegend(colorMode, viewMode) {
+    const legendStops = {
+      area: [0, 500, 1000, 2000, 4000],
+      population: [0, 10000, 50000, 200000, 1000000],
+      density: [0, 10, 100, 500, 2000]
+    };
+    const legendColors = {
+      area: ["#edf8fb","#b2e2e2","#66c2a4","#238b45","#00441b"],
+      population: ["#fff5f0","#fcbba1","#fc9272","#fb6a4a","#a50f15"],
+      density: ["#f7fcf5","#c7e9c0","#74c476","#238b45","#00441b"]
+    };
+
+    const stops = legendStops[colorMode];
+    const colors = legendColors[colorMode];
+    let html = `<div class="legend-title">Color by ${colorMode.charAt(0).toUpperCase() + colorMode.slice(1)}</div>`;
+    stops.forEach((v, i) => {
+      html += `<div><span class="legend-color" style="background:${colors[i]}"></span>${v.toLocaleString()}</div>`;
+    });
+    legendDiv.innerHTML = html;
+  }
+
+  updateLegend(colorMode, mode);
+
+  // 🔁 Toggle button click
+  btn.addEventListener("click", () => {
+    if (mode === "county") {
+      map.setLayoutProperty("county-fill", "visibility", "none");
+      map.setLayoutProperty("county-borders", "visibility", "none");
+      map.setLayoutProperty("lonband-fill", "visibility", "visible");
+      map.setLayoutProperty("lonband-borders", "visibility", "visible");
+      btn.innerText = "Switch to County Coloring";
+      mode = "band";
+    } else {
+      map.setLayoutProperty("county-fill", "visibility", "visible");
+      map.setLayoutProperty("county-borders", "visibility", "visible");
+      map.setLayoutProperty("lonband-fill", "visibility", "none");
+      map.setLayoutProperty("lonband-borders", "visibility", "none");
+      btn.innerText = "Switch to Longitude Bands";
+      mode = "county";
+    }
+    updateLegend(colorMode, mode);
+  });
+
+  // 🎨 Dropdown change
+  select.addEventListener("change", () => {
+    colorMode = select.value;
+    map.setPaintProperty("county-fill", "fill-color", countyPaints[colorMode]);
+    map.setPaintProperty("lonband-fill", "fill-color", bandPaints[colorMode]);
+    const newBands = createLongitudeBands(counties, bandWidth, colorMode);
+    map.getSource("lonbands").setData(newBands);
+    updateLegend(colorMode, mode);
+  });
+
+  // 📏 Slider change (animated width transition)
+  slider.addEventListener("input", () => {
+    const newWidth = parseFloat(slider.value);
+    bandValueDisplay.textContent = newWidth.toFixed(1);
+    const steps = 10;
+    const stepSize = (newWidth - bandWidth) / steps;
+    let currentStep = 0;
+    function animateStep() {
+      if (currentStep >= steps) return;
+      const intermediateWidth = bandWidth + stepSize * (currentStep + 1);
+      const intermediateBands = createLongitudeBands(counties, intermediateWidth, colorMode);
+      map.getSource("lonbands").setData(intermediateBands);
+      currentStep++;
+      requestAnimationFrame(animateStep);
+    }
+    animateStep();
+    bandWidth = newWidth;
+  });
+
 });
 </script>
 </body>
