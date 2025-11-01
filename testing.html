@@ -161,13 +161,7 @@ map.on("load", async () => {
     },
     layout: { visibility: "none" }
   });
-  map.addLayer({
-    id: "lonband-borders",
-    type: "line",
-    source: "lonbands",
-    paint: { "line-color": "#ff6600", "line-width": 1.5, "line-dasharray": [2, 2] },
-    layout: { visibility: "none" }
-  });
+  
 
   // 🟢 NEW: Add US boundary layer on top
   // 🟢 Add US boundary fill and outline on top
