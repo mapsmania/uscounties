@@ -136,16 +136,16 @@ map.on("load", async () => {
       0, "#edf8fb", 500, "#b2e2e2", 1000, "#66c2a4", 2000, "#238b45", 4000, "#00441b"],
     population: ["interpolate", ["linear"], ["get", "avg_value"],
       0, "#fff5f0", 10000, "#fcbba1", 50000, "#fc9272", 200000, "#fb6a4a", 1000000, "#a50f15"],
-    density: ["interpolate", ["linear"], ["get", "avg_value"],
-      0, "#cceeff",
-      5, "#aad8f0",
-      25, "#88c0e0",
-      100, "#ffb3b3",
-      250, "#ff8080",
-      500, "#ff4d4d",
-      1000, "#cc0000",
-      2000, "#660000"
-    ]
+    density: ["interpolate", ["linear"], ["get", "density"],
+  0, "#ffffcc",
+  5, "#ffeda0",
+  25, "#fed976",
+  100, "#feb24c",
+  250, "#fd8d3c",
+  500, "#f03b20",
+  1000, "#bd0026"
+]
+
   };
 
   // --- Add map layers ---
