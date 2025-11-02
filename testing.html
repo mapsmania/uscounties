@@ -148,11 +148,24 @@ map.on("load", async () => {
       0, "#cceeff", 5, "#aad8f0", 25, "#88c0e0", 100, "#ffb3b3", 250, "#ff8080", 500, "#ff4d4d", 1000, "#cc0000", 2000, "#660000"]
   };
 
-  const bandPaints = {
-    area: countyPaints.area,
-    population: countyPaints.population,
-    density: countyPaints.density
-  };
+  // --- Color scales for bands ---
+const bandPaints = {
+  area: ["interpolate", ["linear"], ["get", "avg_value"],
+    0, "#edf8fb", 500, "#b2e2e2", 1000, "#66c2a4", 2000, "#238b45", 4000, "#00441b"],
+  population: ["interpolate", ["linear"], ["get", "avg_value"],
+    0, "#fff5f0", 10000, "#fcbba1", 50000, "#fc9272", 200000, "#fb6a4a", 1000000, "#a50f15"],
+  density: ["interpolate", ["linear"], ["get", "avg_value"],
+    0, "#cceeff",
+    5, "#aad8f0",
+    25, "#88c0e0",
+    100, "#ffb3b3",
+    250, "#ff8080",
+    500, "#ff4d4d",
+    1000, "#cc0000",
+    2000, "#660000"
+  ]
+};
+
 
   // --- Add sources and layers ---
   map.addSource("counties", { type: "geojson", data: counties });
